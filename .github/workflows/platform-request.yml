@@ -1,436 +1,93 @@
 name: Process New Platform Request
-
-on:
+'on':
   issues:
-    types: [opened]
-
+    types:
+    - opened
+permissions:
+  contents: read
+concurrency:
+  group: platform-request-${{ github.event.issue.number }}
+  cancel-in-progress: false
 jobs:
   check-conditions:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       issues: write
     steps:
-      - name: Check Username
-        run: |
-          echo "Expected username: edbpede"
-          echo "Actual username: ${{ github.event.issue.user.login }}"
-          echo "Username matches: ${{ github.event.issue.user.login == 'edbpede' }}"
-
-      - name: Check Labels
-        run: |
-          echo "Labels on issue:"
-          echo "${{ toJSON(github.event.issue.labels) }}"
-          echo "Has platform-request label: ${{ contains(github.event.issue.labels.*.name, 'platform-request') }}"
-
-      - name: Check Conditions and Close Issue if Failed
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const isPlatformRequest = context.payload.issue.labels.some(label => label.name === 'platform-request');
-            const isCorrectUser = context.payload.issue.user.login === 'edbpede';
-
-            if (!isPlatformRequest) {
-              console.log('Not a platform request, skipping checks');
-              return;
-            }
-
-            if (!isCorrectUser) {
-              console.log('Incorrect user detected');
-              const errorBody = [
-                '## ❌ Ugyldig Anmodning',
-                '',
-                '### Fejl',
-                'Kun brugeren "edbpede" kan oprette platformanmodninger.',
-                '',
-                '### Næste Trin',
-                '1. Kontakt venligst administratoren, hvis du mener dette er en fejl',
-                '2. Denne sag vil nu blive lukket'
-              ].join('\n');
-
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: errorBody
-              });
-
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                state: 'closed',
-                state_reason: 'completed'
-              });
-
-              core.setFailed('Invalid user attempted to create platform request');
-            }
-
+    - name: Check Conditions and Close Issue if Failed
+      uses: actions/github-script@v9.0.0
+      with:
+        script: "const isPlatformRequest = context.payload.issue.labels.some(label => label.name === 'platform-request');\n\
+          const isCorrectUser = context.payload.issue.user.login === 'edbpede';\n\nif (!isPlatformRequest)\
+          \ {\n  console.log('Not a platform request, skipping checks');\n  return;\n}\n\nif (!isCorrectUser)\
+          \ {\n  console.log('Incorrect user detected');\n  const errorBody = [\n    '## \u274C Ugyldig\
+          \ Anmodning',\n    '',\n    '### Fejl',\n    'Kun brugeren \"edbpede\" kan oprette platformanmodninger.',\n\
+          \    '',\n    '### N\xE6ste Trin',\n    '1. Kontakt venligst administratoren, hvis du mener\
+          \ dette er en fejl',\n    '2. Denne sag vil nu blive lukket'\n  ].join('\\n');\n\n  await github.rest.issues.createComment({\n\
+          \    owner: context.repo.owner,\n    repo: context.repo.repo,\n    issue_number: context.issue.number,\n\
+          \    body: errorBody\n  });\n\n  await github.rest.issues.update({\n    owner: context.repo.owner,\n\
+          \    repo: context.repo.repo,\n    issue_number: context.issue.number,\n    state: 'closed',\n\
+          \    state_reason: 'completed'\n  });\n\n  core.setFailed('Invalid user attempted to create\
+          \ platform request');\n}\n"
+    timeout-minutes: 5
   create-platform:
     needs: check-conditions
-    if: |
-      github.event.issue.user.login == 'edbpede' &&
-      contains(github.event.issue.labels.*.name, 'platform-request')
-    runs-on: ubuntu-latest
+    if: github.event.issue.user.login == 'edbpede' && contains(github.event.issue.labels.*.name, 'platform-request')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: write
       pull-requests: write
-      issues: write
-
+      actions: write
     steps:
-      - name: Debug Event Info
-        run: |
-          echo "Issue Creator: ${{ github.event.issue.user.login }}"
-          echo "Issue Labels: ${{ toJSON(github.event.issue.labels.*.name) }}"
-          echo "Issue Title: ${{ github.event.issue.title }}"
-          echo "Issue Number: ${{ github.event.issue.number }}"
+    - uses: actions/checkout@v7.0.1
+      with:
+        ref: ${{ github.event.repository.default_branch }}
+        persist-credentials: false
+    - uses: actions/setup-node@v7.0.0
+      with:
+        node-version: 24.20.0
+    - uses: oven-sh/setup-bun@v2.2.0
+      with:
+        bun-version-file: package.json
+    - run: bun install --frozen-lockfile
+    - name: Parse, validate and create platform data
+      id: request
+      run: bun run scripts/platform-request.ts
+    - name: Format the generated platform only
+      env:
+        REQUEST_PATH: ${{ steps.request.outputs.path }}
+      run: bunx biome check --write "$REQUEST_PATH"
+    - name: Propose checked catalog addition
+      id: platform
+      uses: peter-evans/create-pull-request@v8.1.1
+      with:
+        token: ${{ github.token }}
+        base: ${{ github.event.repository.default_branch }}
+        branch: feat/platform-request-${{ github.event.issue.number }}
+        add-paths: ${{ steps.request.outputs.path }}
+        commit-message: 'feat(platform): add requested learning platform'
+        signoff: true
+        title: 'feat(platform): add requested learning platform'
+        body: |-
+          Add the learning platform requested in #${{ github.event.issue.number }}. The parser validates owner, fields, subjects, grades, duplicate names/URLs and destination paths. Full CI is dispatched for this exact commit.
 
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Parse Issue Form
-        id: parse-issue
-        uses: actions/github-script@v9
-        with:
-          script: |
-            console.log('Starting to parse issue form...');
-            const body = context.payload.issue.body;
-            console.log('Issue body:', body);
-
-            const lines = body.split('\n');
-
-            const getData = (field) => {
-              console.log(`Looking for field: ${field}`);
-              const line = lines.find(l => l.includes(`### ${field}`));
-              if (!line) {
-                // Try finding by emoji label if header not found
-                const emojiLine = lines.find(l => l.includes(`📚 ${field}`) ||
-                                                 l.includes(`🏢 ${field}`) ||
-                                                 l.includes(`🔗 ${field}`) ||
-                                                 l.includes(`📖 ${field}`) ||
-                                                 l.includes(`📝 ${field}`) ||
-                                                 l.includes(`📋 ${field}`));
-                if (!emojiLine) {
-                  console.log(`Field not found: ${field}`);
-                  return '';
-                }
-                const value = lines[lines.indexOf(emojiLine) + 2].trim();
-                console.log(`Found value for ${field} with emoji:`, value);
-                return value;
-              }
-              const value = lines[lines.indexOf(line) + 2].trim();
-              console.log(`Found value for ${field}:`, value);
-              return value;
-            };
-
-            const getGrades = () => {
-              console.log('Parsing grades section...');
-
-              // Find the grades section
-              let gradeSection = '';
-              let inGradeSection = false;
-
-              for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                if (line.includes('### Vælg klassetrin')) {
-                  inGradeSection = true;
-                  continue;
-                }
-                if (inGradeSection) {
-                  if (line.startsWith('###')) {
-                    break;
-                  }
-                  gradeSection += line + '\n';
-                }
-              }
-
-              console.log('Grade section:', gradeSection);
-
-              const grades = [];
-              gradeSection.split('\n').forEach(line => {
-                if (line.includes('[x]')) {
-                  // Extract grade number from the format "🎓 X. klasse"
-                  const match = line.match(/🎓\s*(\d+)\./);
-                  if (match) {
-                    const grade = parseInt(match[1], 10);
-                    console.log(`Found selected grade: ${grade}`);
-                    grades.push(grade);
-                  }
-                }
-              });
-
-              console.log('Final grades array:', grades);
-              return grades;
-            };
-
-            console.log('Building platform data object...');
-            const platformData = {
-              name: getData('Platformnavn'),
-              publisher: getData('Udgiver'),
-              url: getData('Platform URL'),
-              subject: getData('Fag'),
-              description: getData('Kort beskrivelse'),
-              longDescription: getData('Detaljeret beskrivelse'),
-              grades: getGrades(),
-              isActive: true,
-              iconOverwrite: false,
-              icon: {
-                name: '',
-                color: ''
-              }
-            };
-
-            console.log('Platform data:', platformData);
-
-            // Sanitize publisher name for directory
-            const publisherDir = platformData.publisher
-              .toLowerCase()
-              .replace(/[^a-z0-9]/g, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '');
-
-            console.log('Sanitized publisher directory:', publisherDir);
-
-            // Create JSON content
-            const jsonContent = JSON.stringify(platformData, null, 2);
-
-            core.setOutput('publisher-dir', publisherDir);
-            core.setOutput('platform-data', jsonContent);
-            core.setOutput('platform-name', platformData.name);
-
-            console.log('Successfully set all outputs');
-
-      - name: Debug Platform Data
-        run: |
-          echo "Platform Name: '${{ fromJson(steps.parse-issue.outputs.platform-data).name }}'"
-          echo "Publisher Directory: '${{ steps.parse-issue.outputs.publisher-dir }}'"
-          echo "Platform Data:"
-          echo '${{ steps.parse-issue.outputs.platform-data }}'
-
-      - name: Check for duplicates
-        id: check-duplicates
-        uses: actions/github-script@v9
-        env:
-          PLATFORM_DATA: ${{ steps.parse-issue.outputs.platform-data }}
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-
-            // Parse the platform data safely
-            let platformData;
-            try {
-              platformData = JSON.parse(process.env.PLATFORM_DATA);
-            } catch (error) {
-              core.setFailed(`Failed to parse platform data: ${error.message}`);
-              return false;
-            }
-
-            const newName = platformData.name.toLowerCase();
-            const newUrl = platformData.url.toLowerCase();
-
-            // Function to recursively get all JSON files
-            function getAllJsonFiles(dir) {
-              let results = [];
-              const items = fs.readdirSync(dir);
-
-              for (const item of items) {
-                const fullPath = path.join(dir, item);
-                const stat = fs.statSync(fullPath);
-
-                if (stat.isDirectory()) {
-                  results = results.concat(getAllJsonFiles(fullPath));
-                } else if (item.endsWith('.json')) {
-                  results.push(fullPath);
-                }
-              }
-
-              return results;
-            }
-
-            // Check all platform JSON files
-            const platformsDir = 'src/content/platforms';
-            const jsonFiles = getAllJsonFiles(platformsDir);
-            let duplicateFound = false;
-            let errorMessage = '';
-            let duplicateFile = '';
-            let duplicatePlatform = null;
-
-            for (const file of jsonFiles) {
-              const content = fs.readFileSync(file, 'utf8');
-              let platform;
-              try {
-                platform = JSON.parse(content);
-              } catch (error) {
-                console.warn(`Failed to parse ${file}: ${error.message}`);
-                continue;
-              }
-
-              if (platform.name && platform.name.toLowerCase() === newName) {
-                duplicateFound = true;
-                errorMessage = `Platform med navnet "${platformData.name}" findes allerede i ${file}`;
-                duplicateFile = file;
-                duplicatePlatform = platform;
-                break;
-              }
-
-              if (platform.url && platform.url.toLowerCase() === newUrl) {
-                duplicateFound = true;
-                errorMessage = `Platform med URL'en "${platformData.url}" findes allerede i ${file}`;
-                duplicateFile = file;
-                duplicatePlatform = platform;
-                break;
-              }
-            }
-
-            if (duplicateFound) {
-              core.setFailed(errorMessage);
-
-              // Get the relative path for better readability
-              const relativePath = duplicateFile.replace('src/content/platforms/', '');
-              const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
-              const fileUrl = `${repoUrl}/blob/main/src/content/platforms/${relativePath}`;
-
-              const errorBody = [
-                '## ❌ Duplikeret Platform Opdaget',
-                '',
-                '### Fejldetaljer',
-                `${errorMessage.replace(duplicateFile, relativePath)}`,
-                '',
-                '### Eksisterende Platform',
-                '```json',
-                JSON.stringify(duplicatePlatform, null, 2),
-                '```',
-                '',
-                '### Reference',
-                `Du kan se den eksisterende platformfil her: [${relativePath}](${fileUrl})`,
-                '',
-                '### Næste Trin',
-                '1. Gennemgå venligst detaljerne for den eksisterende platform ovenfor',
-                '2. Indsend en ny anmodning med et unikt navn og URL',
-                '3. Denne sag vil nu blive lukket',
-                '',
-                'Hvis du mener, dette er en fejl, bedes du oprette en ny sag med din anmodning.'
-              ].join('\n');
-
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: errorBody
-              });
-
-              // Close the issue
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                state: 'closed',
-                state_reason: 'completed'
-              });
-
-              return false;
-            }
-
-            return true;
-
-      - name: Verify publisher directory
-        id: verify-publisher
-        if: success()
-        run: |
-          PUBLISHER_DIR="src/content/platforms/${{ steps.parse-issue.outputs.publisher-dir }}"
-
-          if [ ! -d "$PUBLISHER_DIR" ]; then
-            echo "Publisher directory does not exist. Creating: $PUBLISHER_DIR"
-            mkdir -p "$PUBLISHER_DIR"
-            echo "created=true" >> $GITHUB_OUTPUT
-          else
-            echo "Publisher directory already exists: $PUBLISHER_DIR"
-            echo "created=false" >> $GITHUB_OUTPUT
+          Closes #${{ github.event.issue.number }}
+    - name: Validate the exact platform PR commit
+      if: steps.platform.outputs.pull-request-number != ''
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PLATFORM_PR: ${{ steps.platform.outputs.pull-request-number }}
+        PLATFORM_SHA: ${{ steps.platform.outputs.pull-request-head-sha }}
+        PLATFORM_BRANCH: feat/platform-request-${{ github.event.issue.number }}
+      run: |
+        set -euo pipefail
+        for attempt in 1 2 3; do
+          if gh workflow run ci.yml --ref "$PLATFORM_BRANCH" \
+            -f pr-number="$PLATFORM_PR" -f expected-head-sha="$PLATFORM_SHA"; then
+            exit 0
           fi
-
-      - name: Create platform file
-        if: steps.verify-publisher.outputs.created == 'true' || steps.verify-publisher.outputs.created == 'false'
-        run: |
-          echo "Creating directory structure..."
-          mkdir -p src/content/platforms/${{ steps.parse-issue.outputs.publisher-dir }}
-
-          # Convert platform name to kebab-case for filename
-          PLATFORM_NAME=$(echo "${{ fromJson(steps.parse-issue.outputs.platform-data).name }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\+/-/g' | sed 's/^-\|-$//')
-
-          echo "Writing platform data to file..."
-          echo '${{ steps.parse-issue.outputs.platform-data }}' > src/content/platforms/${{ steps.parse-issue.outputs.publisher-dir }}/${PLATFORM_NAME}.json
-
-          echo "Platform file created successfully"
-          ls -la src/content/platforms/${{ steps.parse-issue.outputs.publisher-dir }}
-
-      - name: Configure git
-        run: |
-          echo "Configuring git..."
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Create Pull Request
-        id: create-pr
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "feat(platform): tilføj ${{ fromJson(steps.parse-issue.outputs.platform-data).name }}"
-          title: "✨ Tilføj platform: ${{ fromJson(steps.parse-issue.outputs.platform-data).name }}"
-          body: |
-            ## Ny platform tilføjet
-
-            Denne PR er automatisk genereret fra issue #${{ github.event.issue.number }}.
-
-            ### Platform detaljer
-            - **Navn**: ${{ fromJson(steps.parse-issue.outputs.platform-data).name }}
-            - **Udgiver**: ${{ steps.parse-issue.outputs.publisher-dir }}
-            - **Issue**: #${{ github.event.issue.number }}
-
-            ### Tjekliste
-            - [ ] Platform data er korrekt formateret
-            - [ ] URL er gyldig og tilgængelig
-            - [ ] Klassetrin er korrekte
-            - [ ] Fagkategorisering er korrekt
-
-            ### Forhåndsvisning
-            ```json
-            ${{ steps.parse-issue.outputs.platform-data }}
-            ```
-
-            Closes #${{ github.event.issue.number }}
-          labels: |
-            platform
-            automated-pr
-          base: main
-          delete-branch: true
-          committer: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
-          author: ${{ github.event.issue.user.login }} <${{ github.event.issue.user.login }}@users.noreply.github.com>
-
-      - name: Debug Pull Request Creation
-        run: |
-          echo "Pull Request Operation: ${{ steps.create-pr.outputs.pull-request-operation }}"
-          echo "Pull Request Number: ${{ steps.create-pr.outputs.pull-request-number }}"
-          echo "Pull Request URL: ${{ steps.create-pr.outputs.pull-request-url }}"
-          echo "Current git status:"
-          git status
-          echo "Git log:"
-          git log -n 3
-
-      - name: Show PR Result
-        if: steps.create-pr.outputs.pull-request-number
-        run: |
-          echo "Pull Request created successfully!"
-          echo "PR Number: ${{ steps.create-pr.outputs.pull-request-number }}"
-          echo "PR URL: ${{ steps.create-pr.outputs.pull-request-url }}"
-
-      - name: Add Comment to Issue
-        uses: peter-evans/create-or-update-comment@v5
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            Tak for din indsendelse af en ny platform! 🎉
-
-            Jeg har oprettet en pull request for at tilføje denne platform. Du kan gennemgå den her: ${{ steps.create-pr.outputs.pull-request-url }}
-
-            Denne issue vil automatisk blive lukket, når PR'en er merged.
+          sleep "$((attempt * 2))"
+        done
+        echo "::error::CI dispatch failed. Run ci.yml on $PLATFORM_BRANCH with pr-number=$PLATFORM_PR and expected-head-sha=$PLATFORM_SHA."
+        exit 1

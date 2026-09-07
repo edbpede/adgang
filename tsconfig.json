@@ -2,5 +2,8 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["dist", "node_modules"],
+  "compilerOptions": {
+    "types": ["astro/client", "bun"]
+  }
 }

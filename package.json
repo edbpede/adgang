@@ -14,11 +14,12 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro check",
+    "check": "astro check && svelte-check --tsconfig ./tsconfig.json",
     "sync": "astro sync",
     "astro": "astro",
     "lint": "biome check .",
-    "lint:fix": "biome check --write ."
+    "lint:fix": "biome check --write .",
+    "test": "bun test tests"
   },
   "type": "module",
   "packageManager": "bun@1.4.2",
@@ -26,6 +27,8 @@
     "@astrojs/check": "^0.9.10",
     "@biomejs/biome": "2.5.10",
     "@iconify-json/lucide": "^1.2.125",
+    "@types/bun": "^1.4.0",
+    "svelte-check": "4.7.6",
     "typescript": "^6.0.3"
   }
 }

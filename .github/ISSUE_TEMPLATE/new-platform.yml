@@ -54,17 +54,14 @@ body:
         - biologi
         - dansk
         - engelsk
-        - fransk
         - fysik-kemi
         - geografi
-        - håndværk-design
+        - handvaerk-design
         - historie
-        - idræt
-        - kristendom
         - madkundskab
         - matematik
-        - musik
         - natur-teknologi
+        - religion
         - samfundsfag
         - tysk
     validations:

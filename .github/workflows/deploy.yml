@@ -1,33 +1,57 @@
 name: Deploy to GitHub Pages
-
-on:
-  push:
+'on':
+  workflow_run:
+    workflows:
+    - ci
+    types:
+    - completed
     branches:
-      - main
-
+    - main
+  workflow_dispatch: null
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
 jobs:
   deploy:
-    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
-    runs-on: ubuntu-latest
-
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == github.event.repository.default_branch
+      || github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Build project
-        run: bun run build
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          cname: portaler.edbpede.net
+    - uses: actions/checkout@v7.0.1
+      with:
+        ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+        persist-credentials: false
+    - name: Use the validated build
+      if: github.event_name == 'workflow_run'
+      uses: actions/download-artifact@v8.0.1
+      with:
+        name: site-dist
+        path: dist/
+        run-id: ${{ github.event.workflow_run.id }}
+        github-token: ${{ github.token }}
+    - uses: actions/setup-node@v7.0.0
+      with:
+        node-version: 24.20.0
+      if: github.event_name == 'workflow_dispatch'
+    - uses: oven-sh/setup-bun@v2.2.0
+      with:
+        bun-version-file: package.json
+      if: github.event_name == 'workflow_dispatch'
+    - uses: actions/setup-python@v7.0.0
+      with:
+        python-version: '3.14'
+      if: github.event_name == 'workflow_dispatch'
+    - if: github.event_name == 'workflow_dispatch'
+      run: |-
+        bun install --frozen-lockfile
+        bash .github/scripts/check.sh
+        bash .github/scripts/smoke.sh
+    - uses: peaceiris/actions-gh-pages@v4.1.0
+      with:
+        github_token: ${{ github.token }}
+        publish_dir: ./dist
+        cname: portaler.edbpede.net
