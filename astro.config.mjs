@@ -4,7 +4,7 @@ import UnoCSS from "unocss/astro";
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://portaler.edbpede.net",
+  site: "https://portaler.edb.fi",
   output: "static",
   // presetWind4 supplies its own reset (uno.config.ts), so we do not inject one here.
   integrations: [UnoCSS(), svelte()],

@@ -1,4 +1,7 @@
 import { expect, test } from "bun:test";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { parsePlatformRequest } from "../scripts/platform-request";
 
 const form = `### 📚 Platformnavn
@@ -62,4 +65,42 @@ test("missing fields and unsafe URL protocols are rejected", () => {
 });
 test("empty normalized publisher names cannot write outside the catalog", () => {
   expect(() => parsePlatformRequest(form.replace("Publisher", "../.."))).toThrow("safe filename");
+});
+
+test("the writer accepts only labeled requests from edbfi", () => {
+  const script = new URL("../scripts/platform-request.ts", import.meta.url).pathname;
+  for (const [login, labeled, accepted] of [
+    ["edbfi", true, true],
+    ["edbpede", true, false],
+    ["another-user", true, false],
+    ["edbfi", false, false],
+  ] as const) {
+    const directory = mkdtempSync(join(tmpdir(), "platform-request-"));
+    try {
+      const eventPath = join(directory, "event.json");
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          issue: {
+            user: { login },
+            labels: labeled ? [{ name: "platform-request" }] : [],
+            body: form,
+          },
+        }),
+      );
+      const result = Bun.spawnSync([process.execPath, "run", script], {
+        cwd: directory,
+        env: {
+          ...process.env,
+          GITHUB_EVENT_PATH: eventPath,
+          GITHUB_OUTPUT: join(directory, "output"),
+        },
+      });
+      expect(result.exitCode === 0).toBe(accepted);
+      expect(existsSync(join(directory, parsePlatformRequest(form).path))).toBe(accepted);
+      if (!accepted) expect(result.stderr.toString()).toContain("Only owner platform requests");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
 });

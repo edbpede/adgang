@@ -57,7 +57,7 @@ if (import.meta.main) {
   if (!eventPath) throw new Error("GITHUB_EVENT_PATH is required");
   const event = JSON.parse(readFileSync(eventPath, "utf8"));
   if (
-    event.issue?.user?.login !== "edbpede" ||
+    event.issue?.user?.login !== "edbfi" ||
     !event.issue.labels.some((label: { name: string }) => label.name === "platform-request")
   ) {
     throw new Error("Only owner platform requests can generate content");

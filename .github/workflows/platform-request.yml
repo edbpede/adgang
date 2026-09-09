@@ -18,10 +18,10 @@ jobs:
       uses: actions/github-script@v9.0.0
       with:
         script: "const isPlatformRequest = context.payload.issue.labels.some(label => label.name === 'platform-request');\n\
-          const isCorrectUser = context.payload.issue.user.login === 'edbpede';\n\nif (!isPlatformRequest)\
+          const isCorrectUser = context.payload.issue.user.login === 'edbfi';\n\nif (!isPlatformRequest)\
           \ {\n  console.log('Not a platform request, skipping checks');\n  return;\n}\n\nif (!isCorrectUser)\
           \ {\n  console.log('Incorrect user detected');\n  const errorBody = [\n    '## \u274C Ugyldig\
-          \ Anmodning',\n    '',\n    '### Fejl',\n    'Kun brugeren \"edbpede\" kan oprette platformanmodninger.',\n\
+          \ Anmodning',\n    '',\n    '### Fejl',\n    'Kun brugeren \"edbfi\" kan oprette platformanmodninger.',\n\
           \    '',\n    '### N\xE6ste Trin',\n    '1. Kontakt venligst administratoren, hvis du mener\
           \ dette er en fejl',\n    '2. Denne sag vil nu blive lukket'\n  ].join('\\n');\n\n  await github.rest.issues.createComment({\n\
           \    owner: context.repo.owner,\n    repo: context.repo.repo,\n    issue_number: context.issue.number,\n\
@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 5
   create-platform:
     needs: check-conditions
-    if: github.event.issue.user.login == 'edbpede' && contains(github.event.issue.labels.*.name, 'platform-request')
+    if: github.event.issue.user.login == 'edbfi' && contains(github.event.issue.labels.*.name, 'platform-request')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:

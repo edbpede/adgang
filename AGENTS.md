@@ -17,7 +17,7 @@ subject. All data is JSON under `src/content/`; no database, no server runtime.
 - `bun run sync` — regenerate `.astro/types.d.ts` after a content-schema change
 
 CI gates on read-only Biome, complementary prek hooks, Astro and Svelte checking,
-seven Bun domain/request fixtures, one build and the existing four HTTP smoke routes.
+eight Bun domain/request fixtures, one build and the existing four HTTP smoke routes.
 Run `bun install --frozen-lockfile`, `bash .github/scripts/check.sh`, and
 `bash .github/scripts/smoke.sh`. See `CI.md` for generated PR dispatch, shared policy,
 required settings and remaining browser coverage gaps.
@@ -76,7 +76,7 @@ exists for the same reason — it exports resolved asset URLs as plain strings.
 
 ## Reference
 
-- `.agents/rules/astro-dev-pro.md` (~630 lines) — Astro 7 / Bun / UnoCSS presetWind4 / Svelte 5
+- `.agents/rules/astro-svelte5-islands.md` (~630 lines) — Astro 7 / Bun / UnoCSS presetWind4 / Svelte 5
   runes / SolidJS conventions and anti-patterns. Read before writing a new island or changing a
   hydration directive; not needed for content edits.
 - `README.md` — "Adding a platform" and "Adding or restyling a subject" walkthroughs plus the
