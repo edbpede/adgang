@@ -35,7 +35,7 @@ jobs:
         github-token: ${{ github.token }}
     - uses: actions/setup-node@v7.0.0
       with:
-        node-version: 24.20.0
+        node-version: 24.21.0
       if: github.event_name == 'workflow_dispatch'
     - uses: oven-sh/setup-bun@v2.2.0
       with:
