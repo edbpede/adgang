@@ -3,7 +3,7 @@ description: Anmod om at tilføje en ny platform til Portaler
 title: "Tilføj platform: "
 labels:
   - platform-request
-assignees: ["edbpede"]
+assignees: ["edbfi"]
 
 body:
   - type: markdown
@@ -54,17 +54,14 @@ body:
         - biologi
         - dansk
         - engelsk
-        - fransk
         - fysik-kemi
         - geografi
-        - håndværk-design
+        - handvaerk-design
         - historie
-        - idræt
-        - kristendom
         - madkundskab
         - matematik
-        - musik
         - natur-teknologi
+        - religion
         - samfundsfag
         - tysk
     validations:
