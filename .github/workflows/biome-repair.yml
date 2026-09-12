@@ -17,19 +17,10 @@ jobs:
       config-files: biome.json
       source-roots: |
         src
+        scripts
+        tests
         astro.config.mjs
         uno.config.ts
         svelte.config.js
-        tests
-        lib
-        entrypoints
-        components
-        test
-        e2e
-        scripts
-        wxt.config.ts
-        uno.config.ts
-        vitest.config.ts
-        playwright.config.ts
       # renovate: datasource=npm depName=bun
       bun-version: 1.4.2
