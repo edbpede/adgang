@@ -1,10 +1,12 @@
 # Development CI and Renovate
 
-`ci` runs for every PR, default-branch push and manual repair dispatch. Require
-`ci / required` from GitHub Actions, with strict up-to-date branches and enforced
-administrator protection. The aggregate rejects failed, missing, cancelled or
-skipped quality/smoke jobs; generated PR dispatches verify the live head both
-before and after CI. Reviews are optional; no default-branch bypass is needed.
+`ci` runs for every PR, default-branch push and manual dispatch. All four
+current-head jobs in `.github/merge-policy.json` must pass before a Renovate
+update can merge unattended, including majors and shared-policy versions.
+The checked action verifies genuine author sign-offs and dispatches full final
+CI for the exact merged commit. No dashboard approvals, branch protections or
+rulesets are required; other changes retain the maintainer ghmerge review.
+PR and final-CI dispatches verify the requested current revision at both gates.
 
 Locally run `bun install --frozen-lockfile`, `bash .github/scripts/check.sh`, then
 `bash .github/scripts/smoke.sh`. CI uses the committed Bun version, read-only
@@ -24,11 +26,15 @@ It explicitly dispatches full CI for the exact PR SHA with `GITHUB_TOKEN`; failu
 report manual recovery inputs. Enable **Allow GitHub Actions to create and approve
 pull requests**. No live issue, comment, PR or catalog addition is created in local
 tests. GitHub Pages publishes only a successful default-branch CI artifact, with
-the `portaler.edb.fi` domain; manual publication validates first.
+the `portaler.edb.fi` domain. Successful final CI dispatches the publisher, which
+requires the newest final push or dispatched CI for the exact main commit to
+have succeeded, then downloads its validated artifact. Both automatic and manual publication
+verify the current default revision before download and immediately before publish.
 
 The versioned `edbfi/automation` preset centralizes dependency managers and
-non-major grouping. Automerge remains off pending the shared pre-1.0 policy
-correction and activation. TypeScript is capped below 7 while Astro/Svelte require
-its JavaScript compiler API. All actions use full version tags. The official Biome
+update grouping. TypeScript updates exercise both Astro and Svelte checks without
+a separate version cap. All actions use full version tags. The official Biome
 version manager handles schema versions, and the isolated repair workflow performs
 migrations/safe formatting before dispatching full CI on the repair commit.
+Repair is restricted to Portaler's actual source, scripts, tests and root framework
+configuration files; unrelated extension paths are excluded.
