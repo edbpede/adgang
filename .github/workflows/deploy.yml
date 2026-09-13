@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: edbfi/automation/actions/dispatch-guard@v1.1.0
+      - uses: edbfi/automation/actions/dispatch-guard@v1.1.1
         with:
           token: ${{ github.token }}
           expected-default-sha: ${{ inputs.expected-default-sha || github.sha }}
@@ -46,7 +46,7 @@ jobs:
           path: dist/
           run-id: ${{ steps.ci.outputs.run-id }}
           github-token: ${{ github.token }}
-      - uses: edbfi/automation/actions/dispatch-guard@v1.1.0
+      - uses: edbfi/automation/actions/dispatch-guard@v1.1.1
         with:
           token: ${{ github.token }}
           expected-default-sha: ${{ inputs.expected-default-sha || github.sha }}
